@@ -2,10 +2,10 @@ import random
 
 # 4
 total_query = 4
-# 50
-total_doc = 6000
+# 5000
+total_doc = 5000
 # 6
-overlap = 6
+overlap = 300
 # 5
 max_score = 8
 
@@ -100,14 +100,17 @@ def generate_ub():
 
 def create_table(upper_bound):
     table = []
-    available_doc = list(range(1, total_doc + 1))
+    available_doc = list(range(1, total_doc + 1 - overlap * (total_query - 1)))
 
     while random.random() > 0.2:
         random.shuffle(available_doc)
 
     # Create posting list for the first t - 1 lists
     for i in range(total_query - 1):
-        length = random.randint(overlap, len(available_doc) - (total_query - i - 1) * overlap)
+        if i == 0:
+            length = random.randint(overlap, len(available_doc))
+        else:
+            length = overlap + random.randint(0, len(available_doc))
 
         posting_list = []
 
@@ -146,6 +149,7 @@ def create_table(upper_bound):
         for j in range(len(table[i])):
             score = random.randint(1, upper_bound[i])
             table[i][j] = (table[i][j], score)
+
     return table
 
 
