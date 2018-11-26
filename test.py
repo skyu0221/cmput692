@@ -1,8 +1,15 @@
 import csv, json
 import numpy as np
 from pprint import pprint
+import difflib
+import numeral
 from tqdm import tqdm
-from Levenshtein import distance
+import Levenshtein
+import itertools
+
+NUMBERS = "0123456789"
+DELIMITERS = "~!@#$%^&*()_+`-={}|[]\:<>?;',./'" + '"'
+ROMAN = "IVXL"
 
 CATEGORY_RATIO = 0.3
 CATEGORY_NUMBER = 5
@@ -11,6 +18,7 @@ FREQUENCY_RATIO = 0.1
 FREQUENCY_NUMBER = 1
 
 DISTANCE_THRESHOLD = 1
+SIMILARITY_THRESHOLD = 0.8
 
 
 class Table:
@@ -85,26 +93,105 @@ class Table:
 
 
 def judge_categorical(unique, count):
-
     count_freq = count / sum(count)
-    candidates = unique[np.logical_or(count <= FREQUENCY_NUMBER, count_freq <= FREQUENCY_RATIO)]
+    # candidates = unique[np.logical_or(count <= FREQUENCY_NUMBER, count_freq <= FREQUENCY_RATIO)]
 
-    for candidate in candidates:
-        for compare in unique:
-            if candidate != compare:
-                if distance(candidate, compare) <= DISTANCE_THRESHOLD:
-                    if min(len(candidate), len(compare)) <= 2:
-                        continue
-                    if len(candidate) > len(compare):
-                        diff = set(candidate) - set(compare)
-                    else:
-                        diff = set(compare) - set(candidate)
-                    for char in list(diff):
-                        if char in "~!@#$%^&*()_+`-={}|[]\:<>?;',./'" + '"':
-                            print("Candidates:", candidate, "and", compare)
-                            print("Unique, count:", unique, count)
-                            print("=================")
+    for pairs in itertools.combinations(unique, 2):
+        if pairs[0] == pairs[1]:
+            continue
 
+        jaro_score = Levenshtein.jaro(pairs[0], pairs[1])
+        l_ratio = Levenshtein.ratio(pairs[0], pairs[1])
+        score = jaro_score * l_ratio
+
+        if score >= SIMILARITY_THRESHOLD:
+
+            word_0 = pairs[0].split(' ')
+            word_1 = pairs[1].split(' ')
+
+            score = 0
+            for a in word_0:
+                for b in word_1:
+                    if a != b:
+                        jaro_score = Levenshtein.jaro(a, b)
+                        l_ratio = Levenshtein.ratio(a, b)
+                        word_score = jaro_score * l_ratio
+
+                        score = max(score, word_score)
+
+        # blocks = difflib.SequenceMatcher(None, pairs[0], pairs[1]).get_matching_blocks()
+        # diff_0 = list()
+        # diff_1 = list()
+        # prefix = pairs[0][:blocks[0].a]
+        # if len(prefix) != 0:
+        #     diff_0.append(prefix)
+        # prefix = pairs[1][:blocks[0].b]
+        # if len(prefix) != 0:
+        #     diff_1.append(prefix)
+        #
+        # for i in range(1, len(blocks)):
+        #     if blocks[i - 1].a + blocks[i - 1].size != blocks[i].a:
+        #         diff_0 += [pairs[0][blocks[i - 1].a + blocks[i - 1].size:blocks[i].a]]
+        #     if blocks[i - 1].b + blocks[i - 1].size != blocks[i].b:
+        #         diff_1 += [pairs[1][blocks[i - 1].b + blocks[i - 1].size:blocks[i].b]]
+        #
+        # diff = list(set(diff_0)) + list(set(diff_1))
+        #
+        # diff_lower = [x.lower() for x in diff]
+        #
+        # possibility = 1
+        #
+        # for i in range(len(diff)):
+        #
+        #     roman = True
+        #     for char in diff[i]:
+        #         if char not in ROMAN:
+        #             roman = False
+        #             break
+        #
+        #     if diff[i].lower() in diff_lower[] or diff[i] in DELIMITERS:
+        #         possibility = 1
+        #         break
+        #
+        #     if roman:
+        #         possibility *= 0.5
+        #     else:
+        #         possibility *= 0.9
+
+
+
+        # diff_0 = []
+        # diff_1 = []
+        # chars_0 = sorted(list(pairs[0]))
+        # chars_1 = sorted(list(pairs[1]))
+        #
+        # while len(chars_0) != 0 and len(chars_1) != 0:
+        #     if chars_0[0] == chars_1[0]:
+        #         chars_0.pop(0)
+        #         chars_1.pop(0)
+        #     elif chars_0[0] > chars_1[0]:
+        #         diff_1.append(chars_1.pop(0))
+        #     else:
+        #         diff_0.append(chars_0.pop(0))
+        # final_score = jaro_score * l_ratio * possibility
+
+        if score >= SIMILARITY_THRESHOLD:
+            # if min(len(candidate), len(compare)) <= 2:
+            #     continue
+            # if len(candidate) > len(compare):
+            #     diff = set(candidate) - set(compare)
+            # else:
+            #     diff = set(compare) - set(candidate)
+            # for char in list(diff):
+            #     if char in DELIMITERS:
+            #         print("Candidates:", candidate, "and", compare)
+            #         print("Unique, count:", unique, count)
+            #         print("=================")
+            print("Candidates:", pairs[0], "and", pairs[1])
+            print("Unique, count:", unique, count)
+            print("Similarity:", score)
+            print("=================")
+            input()
 
 
 def extract_data():
@@ -129,13 +216,17 @@ def extract_data():
 
         numerical = False
         for data in unique_entry:
-            if any(char.isdigit() for char in data):
+            if any(char in NUMBERS + DELIMITERS for char in data):
                 numerical = True
                 break
 
-        if not numerical and (ratio < CATEGORY_RATIO or unique_entry.shape[0] < CATEGORY_NUMBER):
+        if not numerical:
             counter += 1
             judge_categorical(unique_entry, unique_count)
+
+        # if not numerical and (ratio < CATEGORY_RATIO or unique_entry.shape[0] < CATEGORY_NUMBER):
+        #     counter += 1
+        #     judge_categorical(unique_entry, unique_count)
     print(counter)
 
 
