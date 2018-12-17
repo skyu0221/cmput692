@@ -210,7 +210,7 @@ def judge_numerical(column, table):
     for value in column:
         score = 1 - kde.pdf(value)
 
-        if score >= 0.9995:
+        if score >= 0.9999995:
             little_result_counter += 1
             print(table)
             print("Dissimilarity score:", score)
